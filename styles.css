@@ -482,13 +482,13 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     z-index: 5;
     overflow: hidden;
     border-left: 4px solid;
-    /* Appearance varies by color set in JS */
     display: flex;
     flex-direction: column;
     transition: transform 0.2s, box-shadow 0.2s;
     cursor: grab;
     container-type: size;
     container-name: scheduledblock;
+    position: relative;
 }
 
 .scheduled-block:active {
@@ -520,12 +520,15 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 @container scheduledblock (max-height: 80px) {
     .block-header {
-        display: none !important;
+        position: absolute;
+        top: 4px;
+        right: 4px;
     }
 
     .block-title {
         font-size: 0.75rem !important;
         margin-bottom: 0.125rem !important;
+        padding-right: 20px;
     }
 
     .block-details {
