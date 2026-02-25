@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Table Tennis Scheduler</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <h1>PingPong<span class="accent-text">Plan</span></h1>
+            </div>
+
+            <!-- Settings Section -->
+            <section class="control-panel">
+                <h2>Schedule Settings</h2>
+                <div class="form-group row">
+                    <div class="input-wrapper">
+                        <label for="start-time">Start</label>
+                        <input type="time" id="start-time" value="09:00">
+                    </div>
+                    <div class="input-wrapper">
+                        <label for="end-time">End</label>
+                        <input type="time" id="end-time" value="20:00">
+                    </div>
+                    <div class="input-wrapper">
+                        <label for="slot-length">Slot (min)</label>
+                        <input type="number" id="slot-length" value="30" step="5" min="5">
+                    </div>
+                </div>
+                <button id="update-settings-btn" class="btn primary-btn">Update Grid</button>
+            </section>
+
+            <!-- Classes Section -->
+            <section class="control-panel">
+                <h2>Classes</h2>
+                <div class="class-list" id="sidebar-class-list">
+                    <!-- Populated by JS -->
+                </div>
+                <form id="add-class-form" class="add-form">
+                    <input type="text" id="new-class-name" placeholder="E.g., Boys U11" required>
+                    <button type="submit" class="btn icon-btn" title="Add Class">+</button>
+                </form>
+            </section>
+
+            <!-- Unscheduled Blocks Section -->
+            <section class="control-panel flex-grow">
+                <div class="header-with-actions">
+                    <h2>Unscheduled Blocks</h2>
+                    <button id="auto-generate-btn" class="btn text-btn"
+                        title="Generate blocks based on class requirements">Auto-Gen</button>
+                </div>
+
+                <form id="add-block-form" class="add-form stacked">
+                    <div class="form-group row">
+                        <select id="block-class-id" required>
+                            <option value="" disabled selected>Select Class...</option>
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <input type="text" id="block-title" placeholder="E.g., Group games" required>
+                    </div>
+                    <div class="form-group row">
+                        <div class="input-wrapper">
+                            <label for="block-tables">Tables</label>
+                            <input type="number" id="block-tables" value="4" min="1" required>
+                        </div>
+                        <div class="input-wrapper">
+                            <label for="block-duration">Duration (mins)</label>
+                            <input type="number" id="block-duration" value="60" step="5" min="5" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn secondary-btn w-full">Add Block</button>
+                </form>
+
+                <div class="unscheduled-list" id="unscheduled-blocks-container">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+        </aside>
+
+        <!-- Main Schedule Area -->
+        <main class="schedule-main">
+            <header class="schedule-header">
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Tables Active</span>
+                        <span class="stat-value" id="total-tables-stat">0</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="schedule-scroll-container">
+                <!-- Rendered by JS CSS Grid -->
+                <div class="schedule-grid" id="schedule-grid">
+                    <!-- Headers, drop targets, and placed blocks -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
