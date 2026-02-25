@@ -254,8 +254,8 @@ function renderScheduleGrid() {
       </div>
       <div class="block-title" style="color: ${cls.color}">${block.title}</div>
       <div class="block-details">
-        <span>🕒 ${block.scheduled.time} - ${formatTime(bStartMin + block.duration)}</span>
-        <span>🏓 ${block.tables} tables</span>
+        <span class="detail-time">🕒 ${block.scheduled.time} - ${formatTime(bStartMin + block.duration)}</span>
+        <span class="detail-tables">🏓 ${block.tables} tables</span>
       </div>
     `;
 
