@@ -544,15 +544,14 @@ function initApp() {
         }
 
         // Let's create smart defaults:
-        // Groups of 4 = 6 matches per group
         const numGroups = Math.ceil(players / 4);
-        const totalGroupMatches = numGroups * 6; // Assume 1 match takes 1 slot and 1 table
         const slotMins = parseInt(state.config.slotLength, 10);
 
-        // We aim for around 4 slots (e.g. 2 hours if 30m slots) for group stages
-        const groupStageSlots = 4;
+        // Group Stage: Each group has its own table.
+        // Assuming groups of 4 have 6 matches, so it comfortably takes 6 slots per table.
+        const groupStageSlots = 6;
         const groupStageMins = groupStageSlots * slotMins;
-        const tablesNeeded = Math.ceil(totalGroupMatches / groupStageSlots);
+        const tablesNeeded = numGroups;
 
         state.blocks.push({
             id: generateUID(),
@@ -564,14 +563,30 @@ function initApp() {
         });
 
         // Knockouts
-        if (players >= 8) {
-            state.blocks.push({ id: generateUID(), classId: cls.id, title: "Quarter Finals", tables: 4, duration: slotMins, scheduled: null });
-        }
-        if (players >= 4) {
-            state.blocks.push({ id: generateUID(), classId: cls.id, title: "Semi Finals", tables: 2, duration: slotMins, scheduled: null });
-        }
+        // Advance 2 players from each group
+        let currentP = numGroups * 2;
 
-        state.blocks.push({ id: generateUID(), classId: cls.id, title: "Finals & 3rd Place", tables: 2, duration: slotMins, scheduled: null });
+        while (currentP > 1) {
+            let B = Math.pow(2, Math.ceil(Math.log2(currentP)));
+            let matches = currentP === B ? currentP / 2 : currentP - B / 2;
+
+            let roundName = "";
+            if (B === 2) roundName = "Finals";
+            else if (B === 4) roundName = "Semi Finals";
+            else if (B === 8) roundName = "Quarter Finals";
+            else roundName = "Round of " + B;
+
+            state.blocks.push({
+                id: generateUID(),
+                classId: cls.id,
+                title: roundName,
+                tables: matches,
+                duration: slotMins,
+                scheduled: null
+            });
+
+            currentP = B / 2;
+        }
 
         renderAll();
         alert(`Successfully generated group stage and knockout blocks for ${cls.name}!\n\nAdded to the Unscheduled Blocks list.`);
