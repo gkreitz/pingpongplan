@@ -408,9 +408,47 @@ function handleDrop(e) {
     }
 }
 
+function handleUnscheduledDragOver(e) {
+    e.preventDefault(); // allow drop
+    e.dataTransfer.dropEffect = 'move';
+
+    // Only highlight if dragging a scheduled block
+    const block = state.blocks.find(b => b.id === draggedBlockId);
+    if (block && block.scheduled) {
+        e.currentTarget.classList.add('drag-over-unscheduled');
+    }
+}
+
+function handleUnscheduledDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over-unscheduled');
+}
+
+function handleUnscheduledDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over-unscheduled');
+
+    if (!draggedBlockId) return;
+
+    const block = state.blocks.find(b => b.id === draggedBlockId);
+
+    // If it's currently scheduled, unschedule it
+    if (block && block.scheduled) {
+        block.scheduled = null;
+        renderAll();
+    }
+}
+
 // --- Event Listeners Initialization ---
 
 function initApp() {
+    // Setup drop zone for returning blocks to unscheduled on the entire sidebar
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+        sidebar.addEventListener('dragover', handleUnscheduledDragOver);
+        sidebar.addEventListener('dragleave', handleUnscheduledDragLeave);
+        sidebar.addEventListener('drop', handleUnscheduledDrop);
+    }
+
     document.getElementById('update-settings-btn').addEventListener('click', () => {
         state.config.start = document.getElementById('start-time').value;
         state.config.end = document.getElementById('end-time').value;
