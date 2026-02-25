@@ -216,6 +216,10 @@ function renderScheduleGrid() {
     }
 
     // 3. Render Scheduled Blocks
+
+    // Group blocks by cell (classId and time) to handle overlaps
+    const cellGroups = {};
+
     state.blocks.forEach(block => {
         if (!block.scheduled) return;
 
@@ -223,49 +227,76 @@ function renderScheduleGrid() {
         if (clsIndex === -1) return; // Class might have been deleted
 
         const cls = state.classes[clsIndex];
-
         const bStartMin = parseTime(block.scheduled.time);
 
         // Check if it fits within bounds
         if (bStartMin < startMin || bStartMin >= endMin) return;
 
         const rowStart = Math.floor((bStartMin - startMin) / step) + 2;
-        // Calculate how many rows it spans based on duration
         const spanRows = Math.ceil(block.duration / step);
 
-        const bEl = document.createElement('div');
-        bEl.className = 'scheduled-block';
-        bEl.style.gridColumn = `${clsIndex + 2}`;
-        bEl.style.gridRow = `${rowStart} / span ${spanRows}`;
-        bEl.style.backgroundColor = `${cls.color}15`; // ~8% opacity
-        bEl.style.borderColor = cls.color;
+        const cellKey = `${clsIndex}-${rowStart}`;
+        if (!cellGroups[cellKey]) {
+            cellGroups[cellKey] = [];
+        }
 
-        bEl.draggable = true;
-        bEl.dataset.id = block.id;
-
-        bEl.innerHTML = `
-      <div class="block-header" style="display: flex; justify-content: flex-end; margin-bottom: 2px;">
-        <button class="block-action-btn split-block-btn" data-id="${block.id}" title="Split Block" style="color: inherit; background: rgba(0,0,0,0.2); border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;">➗</button>
-      </div>
-      <div class="block-title" style="color: ${cls.color}">${block.title}</div>
-      <div class="block-details">
-        <span class="detail-time">🕒 ${block.scheduled.time} - ${formatTime(bStartMin + block.duration)}</span>
-        <span class="detail-tables">🏓 ${block.tables} tables</span>
-      </div>
-    `;
-
-        // Allow re-dragging
-        bEl.addEventListener('dragstart', handleDragStart);
-
-        // Double click to unschedule
-        bEl.addEventListener('dblclick', () => {
-            if (confirm('Unschedule this block?')) {
-                block.scheduled = null;
-                renderAll();
-            }
+        cellGroups[cellKey].push({
+            block,
+            clsIndex,
+            cls,
+            bStartMin,
+            rowStart,
+            spanRows
         });
+    });
 
-        grid.appendChild(bEl);
+    // Render grouped blocks
+    Object.values(cellGroups).forEach(group => {
+        const overlapCount = group.length;
+
+        group.forEach((item, index) => {
+            const { block, clsIndex, cls, bStartMin, rowStart, spanRows } = item;
+
+            const bEl = document.createElement('div');
+            bEl.className = 'scheduled-block';
+            bEl.style.gridColumn = `${clsIndex + 2}`;
+            bEl.style.gridRow = `${rowStart} / span ${spanRows}`;
+            bEl.style.backgroundColor = `${cls.color}15`; // ~8% opacity
+            bEl.style.borderColor = cls.color;
+
+            // Adjust width and left position for overlapping blocks
+            if (overlapCount > 1) {
+                bEl.style.width = `calc(${100 / overlapCount}% - 4px)`;
+                bEl.style.marginLeft = `calc(${(100 / overlapCount) * index}%)`;
+            }
+
+            bEl.draggable = true;
+            bEl.dataset.id = block.id;
+
+            bEl.innerHTML = `
+          <div class="block-header" style="display: flex; justify-content: flex-end; margin-bottom: 2px;">
+            <button class="block-action-btn split-block-btn" data-id="${block.id}" title="Split Block" style="color: inherit; background: rgba(0,0,0,0.2); border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;">➗</button>
+          </div>
+          <div class="block-title" style="color: ${cls.color}">${block.title}</div>
+          <div class="block-details">
+            <span class="detail-time">🕒 ${block.scheduled.time} - ${formatTime(bStartMin + block.duration)}</span>
+            <span class="detail-tables">🏓 ${block.tables} tables</span>
+          </div>
+        `;
+
+            // Allow re-dragging
+            bEl.addEventListener('dragstart', handleDragStart);
+
+            // Double click to unschedule
+            bEl.addEventListener('dblclick', () => {
+                if (confirm('Unschedule this block?')) {
+                    block.scheduled = null;
+                    renderAll();
+                }
+            });
+
+            grid.appendChild(bEl);
+        });
     });
 
     calculateMaxTables();
