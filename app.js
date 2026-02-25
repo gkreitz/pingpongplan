@@ -211,11 +211,6 @@ function renderScheduleGrid() {
             cell.dataset.time = timeStr;
             cell.dataset.classId = cls.id;
 
-            // Setup drag and drop events
-            cell.addEventListener('dragover', handleDragOver);
-            cell.addEventListener('dragleave', handleDragLeave);
-            cell.addEventListener('drop', handleDrop);
-
             grid.appendChild(cell);
         });
     }
@@ -359,6 +354,7 @@ function handleDragStart(e) {
     draggedBlockId = e.currentTarget.dataset.id;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', draggedBlockId);
+
     setTimeout(() => {
         e.currentTarget.style.opacity = '0.5';
     }, 0);
@@ -372,33 +368,55 @@ document.addEventListener('dragend', (e) => {
         cell.classList.remove('drag-over');
     });
     draggedBlockId = null;
+    currentDragHoverCell = null;
 });
 
-function handleDragOver(e) {
-    e.preventDefault(); // allow drop
-    e.dataTransfer.dropEffect = 'move';
+let currentDragHoverCell = null;
 
-    const block = state.blocks.find(b => b.id === draggedBlockId);
-    if (!block) return;
-
-    if (e.currentTarget.dataset.classId === block.classId) {
-        e.currentTarget.classList.add('drag-over');
-    }
-}
-
-function handleDragLeave(e) {
-    e.currentTarget.classList.remove('drag-over');
-}
-
-function handleDrop(e) {
+function handleGridDragOver(e) {
     e.preventDefault();
-    e.currentTarget.classList.remove('drag-over');
+    e.dataTransfer.dropEffect = 'move';
 
     if (!draggedBlockId) return;
 
     const block = state.blocks.find(b => b.id === draggedBlockId);
-    const time = e.currentTarget.dataset.time;
-    const classId = e.currentTarget.dataset.classId;
+    if (!block) return;
+
+    const elements = document.elementsFromPoint(e.clientX, e.clientY);
+    const cell = elements.find(el => el.classList.contains('grid-cell'));
+
+    if (currentDragHoverCell && currentDragHoverCell !== cell) {
+        currentDragHoverCell.classList.remove('drag-over');
+    }
+
+    currentDragHoverCell = cell;
+
+    if (cell && cell.dataset.classId === block.classId) {
+        cell.classList.add('drag-over');
+    }
+}
+
+function handleGridDragLeave(e) {
+    // Handled by returning from DragOver or DragEnd
+}
+
+function handleGridDrop(e) {
+    e.preventDefault();
+
+    if (currentDragHoverCell) {
+        currentDragHoverCell.classList.remove('drag-over');
+    }
+
+    if (!draggedBlockId) return;
+
+    const elements = document.elementsFromPoint(e.clientX, e.clientY);
+    const cell = elements.find(el => el.classList.contains('grid-cell'));
+
+    if (!cell) return;
+
+    const block = state.blocks.find(b => b.id === draggedBlockId);
+    const time = cell.dataset.time;
+    const classId = cell.dataset.classId;
 
     if (block && classId === block.classId) {
         block.scheduled = { classId, time };
@@ -447,6 +465,14 @@ function initApp() {
         sidebar.addEventListener('dragover', handleUnscheduledDragOver);
         sidebar.addEventListener('dragleave', handleUnscheduledDragLeave);
         sidebar.addEventListener('drop', handleUnscheduledDrop);
+    }
+
+    // Setup drop zone for the main schedule grid
+    const grid = document.getElementById('schedule-grid');
+    if (grid) {
+        grid.addEventListener('dragover', handleGridDragOver);
+        grid.addEventListener('dragleave', handleGridDragLeave);
+        grid.addEventListener('drop', handleGridDrop);
     }
 
     document.getElementById('update-settings-btn').addEventListener('click', () => {
