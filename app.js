@@ -1,5 +1,5 @@
 // --- State Management ---
-const state = {
+let state = {
     config: {
         start: "09:00",
         end: "20:00",
@@ -356,12 +356,39 @@ function attachSplitEvents() {
     });
 }
 
+function saveStateToURL() {
+    try {
+        const json = JSON.stringify(state);
+        // Base64 encode the string to keep the URL visually cleaner and safe
+        const encoded = btoa(encodeURIComponent(json));
+        window.history.replaceState(null, '', '#' + encoded);
+    } catch (e) {
+        console.error("Failed to save state to URL", e);
+    }
+}
+
+function loadStateFromURL() {
+    if (window.location.hash.length > 1) {
+        try {
+            const hash = window.location.hash.substring(1);
+            const decoded = decodeURIComponent(atob(hash));
+            const loadedState = JSON.parse(decoded);
+            if (loadedState && loadedState.config && loadedState.classes && loadedState.blocks) {
+                state = loadedState;
+            }
+        } catch (e) {
+            console.error("Failed to parse state from URL", e);
+        }
+    }
+}
+
 function renderAll() {
     renderSidebarClasses();
     renderUnscheduledBlocks();
     renderScheduleGrid();
     // Attach unified event handlers for elements recreated
     attachSplitEvents();
+    saveStateToURL();
 }
 
 // --- Drag & Drop Handlers ---
@@ -520,6 +547,8 @@ function handleUnscheduledDrop(e) {
 // --- Event Listeners Initialization ---
 
 function initApp() {
+    loadStateFromURL();
+
     // Setup drop zone for returning blocks to unscheduled on the entire sidebar
     const sidebar = document.querySelector('.sidebar');
     if (sidebar) {
