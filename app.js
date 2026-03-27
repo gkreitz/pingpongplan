@@ -3,17 +3,10 @@ const state = {
     config: {
         start: "09:00",
         end: "20:00",
-        slotLength: 30 // minutes
+        slotLength: 20 // minutes
     },
-    classes: [
-        { id: 'class-1', name: "Boys U11", color: "#3b82f6" }, // Blue
-        { id: 'class-2', name: "Girls U11", color: "#ec4899" } // Pink
-    ],
-    blocks: [
-        { id: 'block-1', classId: 'class-1', title: "Group Games", tables: 9, duration: 120, scheduled: null },
-        { id: 'block-2', classId: 'class-2', title: "Group Games", tables: 7, duration: 120, scheduled: null },
-        { id: 'block-3', classId: 'class-1', title: "Quarter Finals", tables: 4, duration: 30, scheduled: null }
-    ]
+    classes: [],
+    blocks: []
 };
 
 // Colors palette for classes
