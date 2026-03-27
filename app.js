@@ -396,11 +396,32 @@ document.addEventListener('dragend', (e) => {
         e.target.style.opacity = '1';
     }
     document.querySelectorAll('.grid-cell').forEach(cell => {
-        cell.classList.remove('drag-over');
+        cell.classList.remove('drag-over', 'drag-invalid');
     });
     draggedBlockId = null;
     currentDragHoverCell = null;
 });
+
+function isTimeSlotAvailable(classId, proposedStartMin, duration, excludeBlockId) {
+    const proposedEndMin = proposedStartMin + duration;
+
+    for (const block of state.blocks) {
+        if (!block.scheduled || block.classId !== classId || block.id === excludeBlockId) continue;
+
+        const existingStartMin = parseTime(block.scheduled.time);
+        const existingEndMin = existingStartMin + block.duration;
+
+        // If they start at the exact same time, allow it (for matching groups)
+        if (existingStartMin === proposedStartMin) continue;
+
+        // Check for any temporal overlap using strict inequalities where applicable
+        // Overlap occurs if (StartA < EndB) and (EndA > StartB)
+        if (proposedStartMin < existingEndMin && proposedEndMin > existingStartMin) {
+            return false;
+        }
+    }
+    return true;
+}
 
 let currentDragHoverCell = null;
 
@@ -417,13 +438,24 @@ function handleGridDragOver(e) {
     const cell = elements.find(el => el.classList.contains('grid-cell'));
 
     if (currentDragHoverCell && currentDragHoverCell !== cell) {
-        currentDragHoverCell.classList.remove('drag-over');
+        currentDragHoverCell.classList.remove('drag-over', 'drag-invalid');
     }
 
     currentDragHoverCell = cell;
 
     if (cell && cell.dataset.classId === block.classId) {
-        cell.classList.add('drag-over');
+        const proposedStartMin = parseTime(cell.dataset.time);
+        const isAvailable = isTimeSlotAvailable(block.classId, proposedStartMin, block.duration, block.id);
+
+        if (isAvailable) {
+            cell.classList.add('drag-over');
+            cell.classList.remove('drag-invalid');
+            e.dataTransfer.dropEffect = 'move';
+        } else {
+            cell.classList.add('drag-invalid');
+            cell.classList.remove('drag-over');
+            e.dataTransfer.dropEffect = 'none'; // Indicate invalid drop visually on cursor if supported
+        }
     }
 }
 
@@ -435,7 +467,7 @@ function handleGridDrop(e) {
     e.preventDefault();
 
     if (currentDragHoverCell) {
-        currentDragHoverCell.classList.remove('drag-over');
+        currentDragHoverCell.classList.remove('drag-over', 'drag-invalid');
     }
 
     if (!draggedBlockId) return;
@@ -450,8 +482,13 @@ function handleGridDrop(e) {
     const classId = cell.dataset.classId;
 
     if (block && classId === block.classId) {
-        block.scheduled = { classId, time };
-        renderAll();
+        const proposedStartMin = parseTime(time);
+        if (isTimeSlotAvailable(classId, proposedStartMin, block.duration, block.id)) {
+            block.scheduled = { classId, time };
+            renderAll();
+        } else {
+            alert('This time slot is occupied by another block that starts at a different time!');
+        }
     } else {
         alert('You cannot schedule a block in a different class column!');
     }

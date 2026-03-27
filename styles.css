@@ -473,6 +473,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     border: 2px dashed var(--accent-primary);
 }
 
+.grid-cell.drag-invalid {
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 2px dashed var(--danger);
+    cursor: not-allowed;
+}
+
 /* Scheduled Blocks on the Grid */
 .scheduled-block {
     margin: 2px;
