@@ -391,65 +391,31 @@ function attachSplitEvents() {
             const block = state.blocks.find(b => b.id === id);
             if (!block) return;
 
-            let splitChoice = prompt("Split block by:\n1. Slots\n2. Tables\n\nEnter 1 or 2:");
-            if (!splitChoice) return;
+            const newTabStr = prompt(`Current tables: ${block.tables}. Enter tables for the NEW split part:`);
+            if (!newTabStr) return;
+            const newTab = parseInt(newTabStr, 10);
 
-            splitChoice = splitChoice.trim();
+            if (newTab > 0 && newTab < block.tables) {
+                const remainder = block.tables - newTab;
+                block.tables = remainder;
 
-            if (splitChoice === '1') {
-                const newSlotsStr = prompt(`Current slots: ${block.slots}. Enter slots for the NEW split part:`);
-                if (!newSlotsStr) return;
-                const newSlots = parseInt(newSlotsStr, 10);
-
-                if (newSlots > 0 && newSlots < block.slots) {
-                    const remainder = block.slots - newSlots;
-                    block.slots = remainder; // original becomes the remainder
-
-                    const newBlockId = generateUID();
-                    state.blocks.push({
-                        id: newBlockId,
-                        originalBlockId: block.originalBlockId || block.id,
-                        classId: block.classId,
-                        title: block.title + " (Split)",
-                        tables: block.tables,
-                        slots: newSlots,
-                        scheduled: null,
-                        phaseType: block.phaseType,
-                        depth: block.depth,
-                        totalMatches: block.totalMatches
-                    });
-                    if (!block.originalBlockId) block.originalBlockId = block.id;
-                    renderAll();
-                } else {
-                    alert('Invalid slots given.');
-                }
-            } else if (splitChoice === '2') {
-                const newTabStr = prompt(`Current tables: ${block.tables}. Enter tables for the NEW split part:`);
-                if (!newTabStr) return;
-                const newTab = parseInt(newTabStr, 10);
-
-                if (newTab > 0 && newTab < block.tables) {
-                    const remainder = block.tables - newTab;
-                    block.tables = remainder;
-
-                    const newBlockId = generateUID();
-                    state.blocks.push({
-                        id: newBlockId,
-                        originalBlockId: block.originalBlockId || block.id,
-                        classId: block.classId,
-                        title: block.title + " (Split)",
-                        tables: newTab,
-                        slots: block.slots,
-                        scheduled: null,
-                        phaseType: block.phaseType,
-                        depth: block.depth,
-                        totalMatches: block.totalMatches
-                    });
-                    if (!block.originalBlockId) block.originalBlockId = block.id;
-                    renderAll();
-                } else {
-                    alert('Invalid tables given.');
-                }
+                const newBlockId = generateUID();
+                state.blocks.push({
+                    id: newBlockId,
+                    originalBlockId: block.originalBlockId || block.id,
+                    classId: block.classId,
+                    title: block.title + " (Split)",
+                    tables: newTab,
+                    slots: block.slots,
+                    scheduled: null,
+                    phaseType: block.phaseType,
+                    depth: block.depth,
+                    totalMatches: block.totalMatches
+                });
+                if (!block.originalBlockId) block.originalBlockId = block.id;
+                renderAll();
+            } else {
+                alert('Invalid tables given.');
             }
         });
     });
@@ -636,15 +602,7 @@ function handleGridDrop(e) {
 
     if (mergeTarget) {
         if (mergeTarget.slots === block.slots) {
-            // Split by tables: restore original tables
             mergeTarget.tables += block.tables;
-            mergeTarget.title = mergeTarget.title.replace(" (Split)", "");
-            state.blocks = state.blocks.filter(b => b.id !== block.id);
-            renderAll();
-            return;
-        } else if (mergeTarget.tables === block.tables) {
-            // Split by slots: restore original slots
-            mergeTarget.slots += block.slots;
             mergeTarget.title = mergeTarget.title.replace(" (Split)", "");
             state.blocks = state.blocks.filter(b => b.id !== block.id);
             renderAll();
