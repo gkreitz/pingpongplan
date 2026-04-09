@@ -455,7 +455,12 @@ function handleGridDragOver(e) {
     if (!block) return;
 
     const elements = document.elementsFromPoint(e.clientX, e.clientY);
-    const cell = elements.find(el => el.classList.contains('grid-cell'));
+    let cell = elements.find(el => el.classList.contains('grid-cell'));
+
+    if (cell && cell.dataset.classId !== block.classId) {
+        const correctCell = document.querySelector(`.grid-cell[data-time="${cell.dataset.time}"][data-class-id="${block.classId}"]`);
+        if (correctCell) cell = correctCell;
+    }
 
     if (currentDragHoverCell && currentDragHoverCell !== cell) {
         currentDragHoverCell.classList.remove('drag-over', 'drag-invalid');
@@ -463,7 +468,7 @@ function handleGridDragOver(e) {
 
     currentDragHoverCell = cell;
 
-    if (cell && cell.dataset.classId === block.classId) {
+    if (cell) {
         const proposedStartMin = parseTime(cell.dataset.time);
         const isAvailable = isTimeSlotAvailable(block.classId, proposedStartMin, block.duration, block.id);
 
@@ -493,24 +498,26 @@ function handleGridDrop(e) {
     if (!draggedBlockId) return;
 
     const elements = document.elementsFromPoint(e.clientX, e.clientY);
-    const cell = elements.find(el => el.classList.contains('grid-cell'));
+    let cell = elements.find(el => el.classList.contains('grid-cell'));
 
     if (!cell) return;
 
     const block = state.blocks.find(b => b.id === draggedBlockId);
-    const time = cell.dataset.time;
-    const classId = cell.dataset.classId;
+    if (!block) return;
 
-    if (block && classId === block.classId) {
-        const proposedStartMin = parseTime(time);
-        if (isTimeSlotAvailable(classId, proposedStartMin, block.duration, block.id)) {
-            block.scheduled = { classId, time };
-            renderAll();
-        } else {
-            alert('This time slot is occupied by another block that starts at a different time!');
-        }
+    if (cell.dataset.classId !== block.classId) {
+        const correctCell = document.querySelector(`.grid-cell[data-time="${cell.dataset.time}"][data-class-id="${block.classId}"]`);
+        if (correctCell) cell = correctCell;
+    }
+
+    const time = cell.dataset.time;
+
+    const proposedStartMin = parseTime(time);
+    if (isTimeSlotAvailable(block.classId, proposedStartMin, block.duration, block.id)) {
+        block.scheduled = { classId: block.classId, time };
+        renderAll();
     } else {
-        alert('You cannot schedule a block in a different class column!');
+        alert('This time slot is occupied by another block that starts at a different time!');
     }
 }
 
