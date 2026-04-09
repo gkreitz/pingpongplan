@@ -653,7 +653,64 @@ function handleGridDrop(e) {
     }
 
     if (isSlotAvailable(block.classId, slotIndex, block.slots, block.id)) {
+        const oldSlotIndex = block.scheduled ? block.scheduled.slotIndex : null;
         block.scheduled = { classId: block.classId, slotIndex };
+
+        // Cascade Push logic
+        if (oldSlotIndex !== null && oldSlotIndex !== slotIndex && block.phaseType && block.phaseType !== "Group") {
+            const moveDown = slotIndex > oldSlotIndex;
+            const classBlocks = state.blocks.filter(b => b.classId === block.classId && b.scheduled && b.phaseType === block.phaseType && b.id !== block.id);
+            
+            let targetDepths = [];
+            let pushDelta = 0;
+            
+            if (moveDown) {
+                 const depths = [...new Set(classBlocks.map(b => b.depth))].filter(d => d < block.depth).sort((a,b) => b - a);
+                 if (depths.length > 0) {
+                      const immediateDepth = depths[0];
+                      const immediateBlocks = classBlocks.filter(b => b.depth === immediateDepth);
+                      const minStart = Math.min(...immediateBlocks.map(b => b.scheduled.slotIndex));
+                      
+                      const overlap = (slotIndex + block.slots) - minStart;
+                      if (overlap > 0) {
+                          pushDelta = overlap;
+                          targetDepths = depths;
+                      }
+                 }
+            } else {
+                 const depths = [...new Set(classBlocks.map(b => b.depth))].filter(d => d > block.depth).sort((a,b) => b - a);
+                 if (depths.length > 0) {
+                      const immediateDepth = depths[depths.length - 1];
+                      const immediateBlocks = classBlocks.filter(b => b.depth === immediateDepth);
+                      const maxEnd = Math.max(...immediateBlocks.map(b => b.scheduled.slotIndex + b.slots));
+                      
+                      const overlap = maxEnd - slotIndex;
+                      if (overlap > 0) {
+                          pushDelta = -overlap; // negative shift
+                          targetDepths = depths;
+                      }
+                 }
+            }
+            
+            if (targetDepths.length > 0) {
+                 const blocksToPush = classBlocks.filter(b => targetDepths.includes(b.depth));
+                 
+                 const startMin = parseTime(state.config.start);
+                 const endMin = parseTime(state.config.end);
+                 const step = parseInt(state.config.slotLength, 10);
+                 const numSlots = Math.ceil((endMin - startMin) / step);
+                 
+                 const minPushedStart = Math.min(...blocksToPush.map(b => b.scheduled.slotIndex + pushDelta));
+                 const maxPushedEnd = Math.max(...blocksToPush.map(b => b.scheduled.slotIndex + pushDelta + b.slots));
+                 
+                 if (minPushedStart >= 0 && maxPushedEnd <= numSlots) {
+                      blocksToPush.forEach(b => {
+                           b.scheduled.slotIndex += pushDelta;
+                      });
+                 }
+            }
+        }
+
         renderAll();
     } else {
         alert('This time slot is occupied by another block that starts at a different time!');
