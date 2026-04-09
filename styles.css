@@ -481,6 +481,19 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     cursor: not-allowed;
 }
 
+.overbooked-bg {
+    background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+.overbooked-bg:hover {
+    background-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+.overbooked-text {
+    color: var(--danger) !important;
+    font-weight: 600 !important;
+}
+
 /* Scheduled Blocks on the Grid */
 .scheduled-block {
     margin: 2px;
