@@ -577,6 +577,84 @@ function handleUnscheduledDrop(e) {
     }
 }
 
+function autoGenerateBlocks(cls) {
+    if (cls.structure === "Manual") return;
+
+    const players = cls.players;
+    const structure = cls.structure;
+    const numGroups = Math.ceil(players / 4);
+    const hasGroup = structure.includes("Group") || structure.includes("group");
+    const hasPlayoff = structure.includes("play-off");
+    const hasCons = structure.includes("consolation");
+
+    if (hasGroup) {
+        const groupStageSlots = 6;
+        const tablesNeeded = numGroups;
+
+        state.blocks.push({
+            id: generateUID(),
+            classId: cls.id,
+            title: "Group Stage",
+            tables: tablesNeeded,
+            slots: groupStageSlots,
+            scheduled: null
+        });
+    }
+
+    if (hasPlayoff) {
+        let currentP = hasGroup ? numGroups * 2 : players;
+
+        while (currentP > 1) {
+            let B = Math.pow(2, Math.ceil(Math.log2(currentP)));
+            let matches = currentP === B ? currentP / 2 : currentP - B / 2;
+
+            let roundName = "";
+            if (B === 2) roundName = "Finals";
+            else if (B === 4) roundName = "Semi Finals";
+            else if (B === 8) roundName = "Quarter Finals";
+            else roundName = "Round of " + B;
+
+            state.blocks.push({
+                id: generateUID(),
+                classId: cls.id,
+                title: roundName,
+                tables: matches,
+                slots: 1,
+                scheduled: null
+            });
+
+            currentP = B / 2;
+        }
+    }
+
+    if (hasCons) {
+        let consolationP = players - (numGroups * 2);
+        if (consolationP > 1) {
+            while (consolationP > 1) {
+                let B = Math.pow(2, Math.ceil(Math.log2(consolationP)));
+                let matches = consolationP === B ? consolationP / 2 : consolationP - B / 2;
+
+                let roundName = "";
+                if (B === 2) roundName = "Consolation Finals";
+                else if (B === 4) roundName = "Consolation Semi Finals";
+                else if (B === 8) roundName = "Consolation Quarter Finals";
+                else roundName = "Consolation Round of " + B;
+
+                state.blocks.push({
+                    id: generateUID(),
+                    classId: cls.id,
+                    title: roundName,
+                    tables: matches,
+                    slots: 1,
+                    scheduled: null
+                });
+
+                consolationP = B / 2;
+            }
+        }
+    }
+}
+
 // --- Event Listeners Initialization ---
 
 function initApp() {
@@ -606,17 +684,44 @@ function initApp() {
         renderAll();
     });
 
-    document.getElementById('add-class-form').addEventListener('submit', (e) => {
+    const classModal = document.getElementById('class-modal');
+    const openModalBtn = document.getElementById('open-class-modal-btn');
+    const closeModalBtn = document.getElementById('close-class-modal-btn');
+    const cancelModalBtn = document.getElementById('cancel-class-modal-btn');
+    const classModalForm = document.getElementById('class-modal-form');
+
+    function hideClassModal() {
+        classModal.style.display = 'none';
+        classModalForm.reset();
+    }
+
+    openModalBtn.addEventListener('click', () => {
+        classModal.style.display = 'flex';
+        document.getElementById('modal-class-name').focus();
+    });
+
+    closeModalBtn.addEventListener('click', hideClassModal);
+    cancelModalBtn.addEventListener('click', hideClassModal);
+
+    classModalForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        const input = document.getElementById('new-class-name');
-        const name = input.value.trim();
-        if (name) {
-            state.classes.push({
+        const name = document.getElementById('modal-class-name').value.trim();
+        const players = parseInt(document.getElementById('modal-class-players').value, 10);
+        const structure = document.getElementById('modal-class-structure').value;
+
+        if (name && players >= 4) {
+            const newClass = {
                 id: generateUID(),
                 name,
+                players,
+                structure,
                 color: palette[state.classes.length % palette.length]
-            });
-            input.value = '';
+            };
+            state.classes.push(newClass);
+            
+            autoGenerateBlocks(newClass);
+            
+            hideClassModal();
             renderAll();
         }
     });
@@ -640,107 +745,6 @@ function initApp() {
             e.target.reset();
             renderAll();
         }
-    });
-
-    // Auto Generate logic
-    document.getElementById('auto-generate-btn').addEventListener('click', () => {
-        if (state.classes.length === 0) {
-            alert("Please add at least one class first.");
-            return;
-        }
-
-        let classNames = state.classes.map(c => c.name).join(', ');
-        const classNameInput = prompt(`Enter the name of the Class to generate blocks for:\nAvailable: ${classNames}`);
-        if (!classNameInput) return;
-
-        const cls = state.classes.find(c => c.name.toLowerCase() === classNameInput.trim().toLowerCase());
-        if (!cls) {
-            alert("Class not found.");
-            return;
-        }
-
-        const playersStr = prompt(`How many players/teams in ${cls.name}? (e.g., 16)`);
-        if (!playersStr) return;
-        const players = parseInt(playersStr, 10);
-        if (isNaN(players) || players < 4) {
-            alert("Please enter a valid number of players (minimum 4).");
-            return;
-        }
-
-        const hasConsolationStr = prompt(`Include a consolation round for non-advancing players? (yes/no)`);
-        const hasConsolation = hasConsolationStr && (hasConsolationStr.trim().toLowerCase() === 'yes' || hasConsolationStr.trim().toLowerCase() === 'y');
-
-        // Let's create smart defaults:
-        const numGroups = Math.ceil(players / 4);
-        const slotMins = parseInt(state.config.slotLength, 10);
-
-        // Group Stage: Each group has its own table.
-        // Assuming groups of 4 have 6 matches, so it comfortably takes 6 slots per table.
-        const groupStageSlots = 6;
-        const tablesNeeded = numGroups;
-
-        state.blocks.push({
-            id: generateUID(),
-            classId: cls.id,
-            title: "Group Stage",
-            tables: tablesNeeded,
-            slots: groupStageSlots,
-            scheduled: null
-        });
-
-        // Knockouts
-        // Advance 2 players from each group
-        let currentP = numGroups * 2;
-
-        while (currentP > 1) {
-            let B = Math.pow(2, Math.ceil(Math.log2(currentP)));
-            let matches = currentP === B ? currentP / 2 : currentP - B / 2;
-
-            let roundName = "";
-            if (B === 2) roundName = "Finals";
-            else if (B === 4) roundName = "Semi Finals";
-            else if (B === 8) roundName = "Quarter Finals";
-            else roundName = "Round of " + B;
-
-            state.blocks.push({
-                id: generateUID(),
-                classId: cls.id,
-                title: roundName,
-                tables: matches,
-                slots: 1,
-                scheduled: null
-            });
-
-            currentP = B / 2;
-        }
-
-        if (hasConsolation) {
-            let consolationP = players - (numGroups * 2);
-            while (consolationP > 1) {
-                let B = Math.pow(2, Math.ceil(Math.log2(consolationP)));
-                let matches = consolationP === B ? consolationP / 2 : consolationP - B / 2;
-
-                let roundName = "";
-                if (B === 2) roundName = "Consolation Finals";
-                else if (B === 4) roundName = "Consolation Semi Finals";
-                else if (B === 8) roundName = "Consolation Quarter Finals";
-                else roundName = "Consolation Round of " + B;
-
-                state.blocks.push({
-                    id: generateUID(),
-                    classId: cls.id,
-                    title: roundName,
-                    tables: matches,
-                    slots: 1,
-                    scheduled: null
-                });
-
-                consolationP = B / 2;
-            }
-        }
-
-        renderAll();
-        alert(`Successfully generated group stage and knockout blocks for ${cls.name}!\n\nAdded to the Unscheduled Blocks list.`);
     });
 
     // Set initial form values based on state defaults

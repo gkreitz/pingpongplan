@@ -51,18 +51,13 @@
                 <div class="class-list" id="sidebar-class-list">
                     <!-- Populated by JS -->
                 </div>
-                <form id="add-class-form" class="add-form">
-                    <input type="text" id="new-class-name" placeholder="E.g., Boys U11" required>
-                    <button type="submit" class="btn icon-btn" title="Add Class">+</button>
-                </form>
+                <button id="open-class-modal-btn" class="btn secondary-btn w-full" style="margin-top: 0.5rem;">+ Add Class</button>
             </section>
 
             <!-- Unscheduled Blocks Section -->
             <section class="control-panel flex-grow">
                 <div class="header-with-actions">
                     <h2>Unscheduled Blocks</h2>
-                    <button id="auto-generate-btn" class="btn text-btn"
-                        title="Generate blocks based on class requirements">Auto-Gen</button>
                 </div>
 
                 <form id="add-block-form" class="add-form stacked">
@@ -112,6 +107,42 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Class Modal -->
+    <div class="modal-overlay" id="class-modal" style="display: none;">
+        <div class="modal-container">
+            <header class="modal-header">
+                <h2>Setup New Class</h2>
+                <button type="button" class="close-modal-btn" id="close-class-modal-btn">&times;</button>
+            </header>
+            <form id="class-modal-form" class="modal-body">
+                <div class="form-group stacked">
+                    <label for="modal-class-name">Class Name</label>
+                    <input type="text" id="modal-class-name" placeholder="E.g., Boys U11" required>
+                </div>
+                <div class="form-group row">
+                    <div class="input-wrapper">
+                        <label for="modal-class-players">Player Count</label>
+                        <input type="number" id="modal-class-players" value="16" min="4" required>
+                    </div>
+                </div>
+                <div class="form-group stacked">
+                    <label for="modal-class-structure">Structure</label>
+                    <select id="modal-class-structure" required>
+                        <option value="Group + play-off">Group + play-off</option>
+                        <option value="Group + play-off + consolation">Group + play-off + consolation</option>
+                        <option value="Only group">Only group</option>
+                        <option value="Only play-off">Only play-off</option>
+                        <option value="Manual">Manual (Create blocks myself)</option>
+                    </select>
+                </div>
+                <footer class="modal-footer">
+                    <button type="button" class="btn secondary-btn" id="cancel-class-modal-btn" style="width: auto;">Cancel</button>
+                    <button type="submit" class="btn primary-btn" style="width: auto;">Create Class</button>
+                </footer>
+            </form>
+        </div>
     </div>
 
     <script src="app.js"></script>
