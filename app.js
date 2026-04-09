@@ -101,7 +101,7 @@ function renderUnscheduledBlocks() {
         </div>
         <div class="block-title">${block.title}</div>
         <div class="block-meta">
-          <span class="meta-item">🕒 ${block.duration}m</span>
+          <span class="meta-item">🕒 ${block.slots} slot(s)</span>
           <span class="meta-item">🏓 ${block.tables} tables</span>
         </div>
       `;
@@ -129,18 +129,15 @@ function calculateMaxTables() {
     const step = parseInt(state.config.slotLength, 10);
 
     let maxConcur = 0;
+    const numSlots = Math.ceil((endMin - startMin) / step);
 
-    for (let t = startMin; t < endMin; t += step) {
+    for (let s = 0; s < numSlots; s++) {
         let activeInSlot = 0;
         state.blocks.forEach(b => {
-            if (!b.scheduled) return;
-            const bStart = parseTime(b.scheduled.time);
-            const bEnd = bStart + b.duration;
-
-            // If block overlaps this slot
-            if (t >= bStart && t < bEnd) {
-                activeInSlot += b.tables;
-            }
+             if (!b.scheduled) return;
+             if (s >= b.scheduled.slotIndex && s < b.scheduled.slotIndex + b.slots) {
+                 activeInSlot += b.tables;
+             }
         });
         if (activeInSlot > maxConcur) maxConcur = activeInSlot;
     }
@@ -192,9 +189,7 @@ function renderScheduleGrid() {
         let activeInSlot = 0;
         state.blocks.forEach(b => {
             if (!b.scheduled) return;
-            const bStart = parseTime(b.scheduled.time);
-            const bEnd = bStart + b.duration;
-            if (currentTimeMin >= bStart && currentTimeMin < bEnd) {
+            if (row >= b.scheduled.slotIndex && row < b.scheduled.slotIndex + b.slots) {
                 activeInSlot += b.tables;
             }
         });
@@ -217,7 +212,7 @@ function renderScheduleGrid() {
             if (isOverbooked) cell.classList.add('overbooked-bg');
             cell.style.gridColumn = `${col + 2}`;
             cell.style.gridRow = `${row + 2}`;
-            cell.dataset.time = timeStr;
+            cell.dataset.slotIndex = row;
             cell.dataset.classId = cls.id;
 
             grid.appendChild(cell);
@@ -236,13 +231,13 @@ function renderScheduleGrid() {
         if (clsIndex === -1) return; // Class might have been deleted
 
         const cls = state.classes[clsIndex];
-        const bStartMin = parseTime(block.scheduled.time);
+        const bSlotIndex = block.scheduled.slotIndex;
 
         // Check if it fits within bounds
-        if (bStartMin < startMin || bStartMin >= endMin) return;
+        if (bSlotIndex < 0 || bSlotIndex >= numSlots) return;
 
-        const rowStart = Math.floor((bStartMin - startMin) / step) + 2;
-        const spanRows = Math.ceil(block.duration / step);
+        const rowStart = bSlotIndex + 2;
+        const spanRows = block.slots;
 
         const cellKey = `${clsIndex}-${rowStart}`;
         if (!cellGroups[cellKey]) {
@@ -253,7 +248,7 @@ function renderScheduleGrid() {
             block,
             clsIndex,
             cls,
-            bStartMin,
+            bSlotIndex,
             rowStart,
             spanRows
         });
@@ -264,7 +259,7 @@ function renderScheduleGrid() {
         const overlapCount = group.length;
 
         group.forEach((item, index) => {
-            const { block, clsIndex, cls, bStartMin, rowStart, spanRows } = item;
+            const { block, clsIndex, cls, bSlotIndex, rowStart, spanRows } = item;
 
             const bEl = document.createElement('div');
             bEl.className = 'scheduled-block';
@@ -282,13 +277,16 @@ function renderScheduleGrid() {
             bEl.draggable = true;
             bEl.dataset.id = block.id;
 
+            const blockStartMin = startMin + (bSlotIndex * step);
+            const blockEndMin = startMin + ((bSlotIndex + block.slots) * step);
+
             bEl.innerHTML = `
           <div class="block-header" style="display: flex; justify-content: flex-end; margin-bottom: 2px;">
             <button class="block-action-btn split-block-btn" data-id="${block.id}" title="Split Block" style="color: inherit; background: rgba(0,0,0,0.2); border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;">➗</button>
           </div>
           <div class="block-title" style="color: ${cls.color}">${block.title}</div>
           <div class="block-details">
-            <span class="detail-time">🕒 ${block.scheduled.time} - ${formatTime(bStartMin + block.duration)}</span>
+            <span class="detail-time">🕒 ${formatTime(blockStartMin)} - ${formatTime(blockEndMin)}</span>
             <span class="detail-tables">🏓 ${block.tables} tables</span>
           </div>
         `;
@@ -320,31 +318,31 @@ function attachSplitEvents() {
             const block = state.blocks.find(b => b.id === id);
             if (!block) return;
 
-            let splitChoice = prompt("Split block by:\n1. Duration (Mins)\n2. Tables\n\nEnter 1 or 2:");
+            let splitChoice = prompt("Split block by:\n1. Slots\n2. Tables\n\nEnter 1 or 2:");
             if (!splitChoice) return;
 
             splitChoice = splitChoice.trim();
 
             if (splitChoice === '1') {
-                const newDurStr = prompt(`Current duration: ${block.duration}m. Enter duration for the NEW split part (e.g., 30):`);
-                if (!newDurStr) return;
-                const newDur = parseInt(newDurStr, 10);
+                const newSlotsStr = prompt(`Current slots: ${block.slots}. Enter slots for the NEW split part:`);
+                if (!newSlotsStr) return;
+                const newSlots = parseInt(newSlotsStr, 10);
 
-                if (newDur > 0 && newDur < block.duration) {
-                    const remainder = block.duration - newDur;
-                    block.duration = remainder; // original becomes the remainder
+                if (newSlots > 0 && newSlots < block.slots) {
+                    const remainder = block.slots - newSlots;
+                    block.slots = remainder; // original becomes the remainder
 
                     state.blocks.push({
                         id: generateUID(),
                         classId: block.classId,
                         title: block.title + " (Split)",
                         tables: block.tables,
-                        duration: newDur,
+                        slots: newSlots,
                         scheduled: null // Place in unscheduled bin
                     });
                     renderAll();
                 } else {
-                    alert('Invalid duration given.');
+                    alert('Invalid slots given.');
                 }
             } else if (splitChoice === '2') {
                 const newTabStr = prompt(`Current tables: ${block.tables}. Enter tables for the NEW split part:`);
@@ -360,7 +358,7 @@ function attachSplitEvents() {
                         classId: block.classId,
                         title: block.title + " (Split)",
                         tables: newTab,
-                        duration: block.duration,
+                        slots: block.slots,
                         scheduled: null
                     });
                     renderAll();
@@ -390,6 +388,21 @@ function loadStateFromURL() {
             const decoded = decodeURIComponent(atob(hash));
             const loadedState = JSON.parse(decoded);
             if (loadedState && loadedState.config && loadedState.classes && loadedState.blocks) {
+                // Backward compatibility transform
+                const step = parseInt(loadedState.config.slotLength || 20, 10);
+                const startMin = parseTime(loadedState.config.start || "09:00");
+                
+                loadedState.blocks.forEach(b => {
+                    if (b.duration !== undefined) {
+                        b.slots = Math.max(1, Math.round(b.duration / step));
+                        delete b.duration;
+                    }
+                    if (b.scheduled && b.scheduled.time !== undefined) {
+                        const bTimeMin = parseTime(b.scheduled.time);
+                        b.scheduled.slotIndex = Math.round((bTimeMin - startMin) / step);
+                        delete b.scheduled.time;
+                    }
+                });
                 state = loadedState;
             }
         } catch (e) {
@@ -438,21 +451,19 @@ document.addEventListener('dragend', (e) => {
     currentDragHoverCell = null;
 });
 
-function isTimeSlotAvailable(classId, proposedStartMin, duration, excludeBlockId) {
-    const proposedEndMin = proposedStartMin + duration;
+function isSlotAvailable(classId, proposedSlotIndex, slots, excludeBlockId) {
+    const proposedEndSlot = proposedSlotIndex + slots;
 
     for (const block of state.blocks) {
         if (!block.scheduled || block.classId !== classId || block.id === excludeBlockId) continue;
 
-        const existingStartMin = parseTime(block.scheduled.time);
-        const existingEndMin = existingStartMin + block.duration;
+        const existingStartSlot = block.scheduled.slotIndex;
+        const existingEndSlot = existingStartSlot + block.slots;
 
         // If they start at the exact same time, allow it (for matching groups)
-        if (existingStartMin === proposedStartMin) continue;
+        if (existingStartSlot === proposedSlotIndex) continue;
 
-        // Check for any temporal overlap using strict inequalities where applicable
-        // Overlap occurs if (StartA < EndB) and (EndA > StartB)
-        if (proposedStartMin < existingEndMin && proposedEndMin > existingStartMin) {
+        if (proposedSlotIndex < existingEndSlot && proposedEndSlot > existingStartSlot) {
             return false;
         }
     }
@@ -474,7 +485,7 @@ function handleGridDragOver(e) {
     let cell = elements.find(el => el.classList.contains('grid-cell'));
 
     if (cell && cell.dataset.classId !== block.classId) {
-        const correctCell = document.querySelector(`.grid-cell[data-time="${cell.dataset.time}"][data-class-id="${block.classId}"]`);
+        const correctCell = document.querySelector(`.grid-cell[data-slot-index="${cell.dataset.slotIndex}"][data-class-id="${block.classId}"]`);
         if (correctCell) cell = correctCell;
     }
 
@@ -485,8 +496,8 @@ function handleGridDragOver(e) {
     currentDragHoverCell = cell;
 
     if (cell) {
-        const proposedStartMin = parseTime(cell.dataset.time);
-        const isAvailable = isTimeSlotAvailable(block.classId, proposedStartMin, block.duration, block.id);
+        const proposedSlotIndex = parseInt(cell.dataset.slotIndex, 10);
+        const isAvailable = isSlotAvailable(block.classId, proposedSlotIndex, block.slots, block.id);
 
         if (isAvailable) {
             cell.classList.add('drag-over');
@@ -522,15 +533,14 @@ function handleGridDrop(e) {
     if (!block) return;
 
     if (cell.dataset.classId !== block.classId) {
-        const correctCell = document.querySelector(`.grid-cell[data-time="${cell.dataset.time}"][data-class-id="${block.classId}"]`);
+        const correctCell = document.querySelector(`.grid-cell[data-slot-index="${cell.dataset.slotIndex}"][data-class-id="${block.classId}"]`);
         if (correctCell) cell = correctCell;
     }
 
-    const time = cell.dataset.time;
+    const slotIndex = parseInt(cell.dataset.slotIndex, 10);
 
-    const proposedStartMin = parseTime(time);
-    if (isTimeSlotAvailable(block.classId, proposedStartMin, block.duration, block.id)) {
-        block.scheduled = { classId: block.classId, time };
+    if (isSlotAvailable(block.classId, slotIndex, block.slots, block.id)) {
+        block.scheduled = { classId: block.classId, slotIndex };
         renderAll();
     } else {
         alert('This time slot is occupied by another block that starts at a different time!');
@@ -616,15 +626,15 @@ function initApp() {
         const classId = document.getElementById('block-class-id').value;
         const title = document.getElementById('block-title').value.trim();
         const tables = parseInt(document.getElementById('block-tables').value, 10);
-        const duration = parseInt(document.getElementById('block-duration').value, 10);
+        const slots = parseInt(document.getElementById('block-slots').value, 10);
 
-        if (classId && title && tables > 0 && duration > 0) {
+        if (classId && title && tables > 0 && slots > 0) {
             state.blocks.push({
                 id: generateUID(),
                 classId,
                 title,
                 tables,
-                duration,
+                slots,
                 scheduled: null
             });
             e.target.reset();
@@ -667,7 +677,6 @@ function initApp() {
         // Group Stage: Each group has its own table.
         // Assuming groups of 4 have 6 matches, so it comfortably takes 6 slots per table.
         const groupStageSlots = 6;
-        const groupStageMins = groupStageSlots * slotMins;
         const tablesNeeded = numGroups;
 
         state.blocks.push({
@@ -675,7 +684,7 @@ function initApp() {
             classId: cls.id,
             title: "Group Stage",
             tables: tablesNeeded,
-            duration: groupStageMins,
+            slots: groupStageSlots,
             scheduled: null
         });
 
@@ -698,7 +707,7 @@ function initApp() {
                 classId: cls.id,
                 title: roundName,
                 tables: matches,
-                duration: slotMins,
+                slots: 1,
                 scheduled: null
             });
 
@@ -722,7 +731,7 @@ function initApp() {
                     classId: cls.id,
                     title: roundName,
                     tables: matches,
-                    duration: slotMins,
+                    slots: 1,
                     scheduled: null
                 });
 
