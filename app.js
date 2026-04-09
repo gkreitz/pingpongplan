@@ -288,6 +288,33 @@ function renderScheduleGrid() {
         checkDependency("Consolation", "Consolation");
     });
 
+    // Check for Avoid Overlap violations
+    state.blocks.forEach(b1 => {
+        b1.overlapWarning = false;
+    });
+
+    state.blocks.forEach(b1 => {
+        if (!b1.scheduled) return;
+        const cls1 = state.classes.find(c => c.id === b1.classId);
+        if (!cls1 || !cls1.avoidOverlap || cls1.avoidOverlap.length === 0) return;
+
+        const b1Start = b1.scheduled.slotIndex;
+        const b1End = b1Start + b1.slots;
+
+        for (const b2 of state.blocks) {
+            if (!b2.scheduled || b2.id === b1.id) continue;
+            if (cls1.avoidOverlap.includes(b2.classId)) {
+                const b2Start = b2.scheduled.slotIndex;
+                const b2End = b2Start + b2.slots;
+                
+                if (b1Start < b2End && b1End > b2Start) {
+                    b1.overlapWarning = true;
+                    b2.overlapWarning = true;
+                }
+            }
+        }
+    });
+
     // Group blocks by cell (classId and time) to handle overlaps
     const cellGroups = {};
 
@@ -343,6 +370,8 @@ function renderScheduleGrid() {
 
             if (block.outOfOrder) {
                 bEl.classList.add('out-of-order-bg');
+            } else if (block.overlapWarning) {
+                bEl.classList.add('overlap-warning-bg');
             }
 
             bEl.draggable = true;
@@ -351,7 +380,7 @@ function renderScheduleGrid() {
             const blockStartMin = startMin + (bSlotIndex * step);
             const blockEndMin = startMin + ((bSlotIndex + block.slots) * step);
 
-            const titleIcon = block.outOfOrder ? '⚠️ ' : '';
+            const titleIcon = block.outOfOrder ? '⚠️ ' : (block.overlapWarning ? '⚠️ ' : '');
 
             bEl.innerHTML = `
           <div class="block-header" style="display: flex; justify-content: flex-end; margin-bottom: 2px;">
@@ -839,6 +868,24 @@ function initApp() {
     }
 
     openModalBtn.addEventListener('click', () => {
+        const overlapGroup = document.getElementById('modal-class-overlap-group');
+        const overlapContainer = document.getElementById('modal-class-overlap-container');
+        overlapContainer.innerHTML = '';
+
+        if (state.classes.length > 0) {
+            overlapGroup.style.display = 'block';
+            state.classes.forEach(c => {
+                overlapContainer.innerHTML += `
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: var(--text-main);">
+                        <input type="checkbox" value="${c.id}" class="overlap-checkbox">
+                        <span style="color: ${c.color}">${c.name}</span>
+                    </label>
+                `;
+            });
+        } else {
+            overlapGroup.style.display = 'none';
+        }
+
         classModal.style.display = 'flex';
         document.getElementById('modal-class-name').focus();
     });
@@ -853,13 +900,28 @@ function initApp() {
         const structure = document.getElementById('modal-class-structure').value;
 
         if (name && players >= 4) {
+            const avoidOverlap = Array.from(document.querySelectorAll('.overlap-checkbox:checked')).map(cb => cb.value);
+
             const newClass = {
                 id: generateUID(),
                 name,
                 players,
                 structure,
-                color: palette[state.classes.length % palette.length]
+                color: palette[state.classes.length % palette.length],
+                avoidOverlap
             };
+
+            // Enforce bidirectional overlap restriction
+            avoidOverlap.forEach(targetId => {
+                const targetClass = state.classes.find(c => c.id === targetId);
+                if (targetClass) {
+                    if (!targetClass.avoidOverlap) targetClass.avoidOverlap = [];
+                    if (!targetClass.avoidOverlap.includes(newClass.id)) {
+                        targetClass.avoidOverlap.push(newClass.id);
+                    }
+                }
+            });
+
             state.classes.push(newClass);
             
             autoGenerateBlocks(newClass);

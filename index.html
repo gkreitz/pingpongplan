@@ -137,6 +137,12 @@
                         <option value="Manual">Manual (Create blocks myself)</option>
                     </select>
                 </div>
+                <div class="form-group stacked" id="modal-class-overlap-group" style="display: none;">
+                    <label>Avoid Overlapping With</label>
+                    <div id="modal-class-overlap-container" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 120px; overflow-y: auto; background: var(--bg-secondary); padding: 0.5rem; border-radius: var(--radius-md);">
+                        <!-- Dynamic checkboxes injected here -->
+                    </div>
+                </div>
                 <footer class="modal-footer">
                     <button type="button" class="btn secondary-btn" id="cancel-class-modal-btn" style="width: auto;">Cancel</button>
                     <button type="submit" class="btn primary-btn" style="width: auto;">Create Class</button>
