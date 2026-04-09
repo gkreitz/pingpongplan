@@ -347,6 +347,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     flex-direction: column;
     background-color: var(--bg-color);
     position: relative;
+    min-width: 0;
+    min-height: 0;
 }
 
 .schedule-header {

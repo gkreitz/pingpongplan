@@ -633,6 +633,9 @@ function initApp() {
             return;
         }
 
+        const hasConsolationStr = prompt(`Include a consolation round for non-advancing players? (yes/no)`);
+        const hasConsolation = hasConsolationStr && (hasConsolationStr.trim().toLowerCase() === 'yes' || hasConsolationStr.trim().toLowerCase() === 'y');
+
         // Let's create smart defaults:
         const numGroups = Math.ceil(players / 4);
         const slotMins = parseInt(state.config.slotLength, 10);
@@ -676,6 +679,31 @@ function initApp() {
             });
 
             currentP = B / 2;
+        }
+
+        if (hasConsolation) {
+            let consolationP = players - (numGroups * 2);
+            while (consolationP > 1) {
+                let B = Math.pow(2, Math.ceil(Math.log2(consolationP)));
+                let matches = consolationP === B ? consolationP / 2 : consolationP - B / 2;
+
+                let roundName = "";
+                if (B === 2) roundName = "Consolation Finals";
+                else if (B === 4) roundName = "Consolation Semi Finals";
+                else if (B === 8) roundName = "Consolation Quarter Finals";
+                else roundName = "Consolation Round of " + B;
+
+                state.blocks.push({
+                    id: generateUID(),
+                    classId: cls.id,
+                    title: roundName,
+                    tables: matches,
+                    duration: slotMins,
+                    scheduled: null
+                });
+
+                consolationP = B / 2;
+            }
         }
 
         renderAll();
