@@ -221,6 +221,73 @@ function renderScheduleGrid() {
 
     // 3. Render Scheduled Blocks
 
+    // Check for Out-Of-Order violations
+    state.blocks.forEach(b => b.outOfOrder = false);
+
+    state.classes.forEach(cls => {
+        const classBlocks = state.blocks.filter(b => b.classId === cls.id && b.scheduled && b.phaseType);
+        if (classBlocks.length === 0) return;
+        
+        // Find Group Phase Finish Time
+        const groupBlocks = classBlocks.filter(b => b.phaseType === "Group");
+        let groupFinishSlot = -1;
+        if (groupBlocks.length > 0) {
+            groupFinishSlot = Math.max(...groupBlocks.map(b => b.scheduled.slotIndex + b.slots));
+        }
+
+        // For any non-Group blocks, if they start before Group finishes, it's out of order
+        if (groupFinishSlot > -1) {
+            classBlocks.filter(b => b.phaseType !== "Group").forEach(b => {
+                 if (b.scheduled.slotIndex < groupFinishSlot) {
+                     b.outOfOrder = true;
+                 }
+            });
+        }
+
+        function checkDependency(typeA, typeT) {
+             const blocksA = classBlocks.filter(b => b.phaseType === typeA);
+             const blocksT = classBlocks.filter(b => b.phaseType === typeT);
+             if (blocksT.length === 0 || blocksA.length === 0) return;
+
+             const depthsA = [...new Set(blocksA.map(b => b.depth))];
+             const depthsT = [...new Set(blocksT.map(b => b.depth))];
+             const allDepths = [...new Set([...depthsA, ...depthsT])].sort((a,b) => b - a);
+             
+             for (let i = 0; i < allDepths.length; i++) {
+                 for (let j = i + 1; j < allDepths.length; j++) {
+                     const dA = allDepths[i];
+                     const dT = allDepths[j];
+                     
+                     const A = blocksA.filter(b => b.depth === dA);
+                     const T = blocksT.filter(b => b.depth === dT);
+                     
+                     if (A.length === 0 || T.length === 0) continue;
+                     
+                     const totalMatchesT = T[0].totalMatches;
+                     const totalMatchesA = A[0].totalMatches;
+                     
+                     T.forEach(bT => {
+                          if (bT.outOfOrder) return;
+                          const t = bT.scheduled.slotIndex;
+                          
+                          const startedT = T.filter(b => b.scheduled.slotIndex <= t).reduce((sum, b) => sum + b.tables, 0);
+                          const finishedA = A.filter(b => (b.scheduled.slotIndex + b.slots) <= t).reduce((sum, b) => sum + b.tables, 0);
+                          
+                          const availableSpots = (2 * totalMatchesT - totalMatchesA) + finishedA;
+                          const maxMatches = Math.floor(availableSpots / 2);
+                          
+                          if (startedT > maxMatches) {
+                               bT.outOfOrder = true;
+                          }
+                     });
+                 }
+             }
+        }
+        
+        checkDependency("Playoff", "Playoff");
+        checkDependency("Consolation", "Consolation");
+    });
+
     // Group blocks by cell (classId and time) to handle overlaps
     const cellGroups = {};
 
@@ -274,17 +341,23 @@ function renderScheduleGrid() {
                 bEl.style.marginLeft = `calc(${(100 / overlapCount) * index}%)`;
             }
 
+            if (block.outOfOrder) {
+                bEl.classList.add('out-of-order-bg');
+            }
+
             bEl.draggable = true;
             bEl.dataset.id = block.id;
 
             const blockStartMin = startMin + (bSlotIndex * step);
             const blockEndMin = startMin + ((bSlotIndex + block.slots) * step);
 
+            const titleIcon = block.outOfOrder ? '⚠️ ' : '';
+
             bEl.innerHTML = `
           <div class="block-header" style="display: flex; justify-content: flex-end; margin-bottom: 2px;">
             <button class="block-action-btn split-block-btn" data-id="${block.id}" title="Split Block" style="color: inherit; background: rgba(0,0,0,0.2); border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;">➗</button>
           </div>
-          <div class="block-title" style="color: ${cls.color}">${block.title}</div>
+          <div class="block-title" style="color: ${cls.color}">${titleIcon}${block.title}</div>
           <div class="block-details">
             <span class="detail-time">🕒 ${formatTime(blockStartMin)} - ${formatTime(blockEndMin)}</span>
             <span class="detail-tables">🏓 ${block.tables} tables</span>
@@ -332,14 +405,20 @@ function attachSplitEvents() {
                     const remainder = block.slots - newSlots;
                     block.slots = remainder; // original becomes the remainder
 
+                    const newBlockId = generateUID();
                     state.blocks.push({
-                        id: generateUID(),
+                        id: newBlockId,
+                        originalBlockId: block.originalBlockId || block.id,
                         classId: block.classId,
                         title: block.title + " (Split)",
                         tables: block.tables,
                         slots: newSlots,
-                        scheduled: null // Place in unscheduled bin
+                        scheduled: null,
+                        phaseType: block.phaseType,
+                        depth: block.depth,
+                        totalMatches: block.totalMatches
                     });
+                    if (!block.originalBlockId) block.originalBlockId = block.id;
                     renderAll();
                 } else {
                     alert('Invalid slots given.');
@@ -353,14 +432,20 @@ function attachSplitEvents() {
                     const remainder = block.tables - newTab;
                     block.tables = remainder;
 
+                    const newBlockId = generateUID();
                     state.blocks.push({
-                        id: generateUID(),
+                        id: newBlockId,
+                        originalBlockId: block.originalBlockId || block.id,
                         classId: block.classId,
                         title: block.title + " (Split)",
                         tables: newTab,
                         slots: block.slots,
-                        scheduled: null
+                        scheduled: null,
+                        phaseType: block.phaseType,
+                        depth: block.depth,
+                        totalMatches: block.totalMatches
                     });
+                    if (!block.originalBlockId) block.originalBlockId = block.id;
                     renderAll();
                 } else {
                     alert('Invalid tables given.');
@@ -539,6 +624,34 @@ function handleGridDrop(e) {
 
     const slotIndex = parseInt(cell.dataset.slotIndex, 10);
 
+    // Check for merge candidate
+    const mergeTarget = state.blocks.find(b => 
+        b.id !== block.id && 
+        b.classId === block.classId && 
+        b.originalBlockId && 
+        b.originalBlockId === block.originalBlockId && 
+        b.scheduled && 
+        b.scheduled.slotIndex === slotIndex
+    );
+
+    if (mergeTarget) {
+        if (mergeTarget.slots === block.slots) {
+            // Split by tables: restore original tables
+            mergeTarget.tables += block.tables;
+            mergeTarget.title = mergeTarget.title.replace(" (Split)", "");
+            state.blocks = state.blocks.filter(b => b.id !== block.id);
+            renderAll();
+            return;
+        } else if (mergeTarget.tables === block.tables) {
+            // Split by slots: restore original slots
+            mergeTarget.slots += block.slots;
+            mergeTarget.title = mergeTarget.title.replace(" (Split)", "");
+            state.blocks = state.blocks.filter(b => b.id !== block.id);
+            renderAll();
+            return;
+        }
+    }
+
     if (isSlotAvailable(block.classId, slotIndex, block.slots, block.id)) {
         block.scheduled = { classId: block.classId, slotIndex };
         renderAll();
@@ -591,13 +704,18 @@ function autoGenerateBlocks(cls) {
         const groupStageSlots = 6;
         const tablesNeeded = numGroups;
 
+        const blockId = generateUID();
         state.blocks.push({
-            id: generateUID(),
+            id: blockId,
+            originalBlockId: blockId,
             classId: cls.id,
             title: "Group Stage",
             tables: tablesNeeded,
             slots: groupStageSlots,
-            scheduled: null
+            scheduled: null,
+            phaseType: "Group",
+            depth: 0,
+            totalMatches: tablesNeeded
         });
     }
 
@@ -614,13 +732,18 @@ function autoGenerateBlocks(cls) {
             else if (B === 8) roundName = "Quarter Finals";
             else roundName = "Round of " + B;
 
+            const blockId = generateUID();
             state.blocks.push({
-                id: generateUID(),
+                id: blockId,
+                originalBlockId: blockId,
                 classId: cls.id,
                 title: roundName,
                 tables: matches,
                 slots: 1,
-                scheduled: null
+                scheduled: null,
+                phaseType: "Playoff",
+                depth: B,
+                totalMatches: matches
             });
 
             currentP = B / 2;
@@ -640,13 +763,18 @@ function autoGenerateBlocks(cls) {
                 else if (B === 8) roundName = "Consolation Quarter Finals";
                 else roundName = "Consolation Round of " + B;
 
+                const blockId = generateUID();
                 state.blocks.push({
-                    id: generateUID(),
+                    id: blockId,
+                    originalBlockId: blockId,
                     classId: cls.id,
                     title: roundName,
                     tables: matches,
                     slots: 1,
-                    scheduled: null
+                    scheduled: null,
+                    phaseType: "Consolation",
+                    depth: B,
+                    totalMatches: matches
                 });
 
                 consolationP = B / 2;
@@ -734,8 +862,10 @@ function initApp() {
         const slots = parseInt(document.getElementById('block-slots').value, 10);
 
         if (classId && title && tables > 0 && slots > 0) {
+            const blockId = generateUID();
             state.blocks.push({
-                id: generateUID(),
+                id: blockId,
+                originalBlockId: blockId,
                 classId,
                 title,
                 tables,

@@ -522,6 +522,17 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     z-index: 6;
 }
 
+.scheduled-block.out-of-order-bg {
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.8), var(--shadow-sm); /* Red ringing */
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(239, 68, 68, 0.1) 10px,
+        rgba(239, 68, 68, 0.1) 20px
+    );
+}
+
 .scheduled-block .block-title {
     font-size: 0.875rem;
     font-weight: 600;
