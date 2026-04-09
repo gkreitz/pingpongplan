@@ -3,7 +3,8 @@ let state = {
     config: {
         start: "09:00",
         end: "20:00",
-        slotLength: 20 // minutes
+        slotLength: 20, // minutes
+        tablesAvailable: 16
     },
     classes: [],
     blocks: []
@@ -187,9 +188,23 @@ function renderScheduleGrid() {
         const currentTimeMin = startMin + (row * step);
         const timeStr = formatTime(currentTimeMin);
 
+        // Calculate total tables currently used in this slot
+        let activeInSlot = 0;
+        state.blocks.forEach(b => {
+            if (!b.scheduled) return;
+            const bStart = parseTime(b.scheduled.time);
+            const bEnd = bStart + b.duration;
+            if (currentTimeMin >= bStart && currentTimeMin < bEnd) {
+                activeInSlot += b.tables;
+            }
+        });
+
+        const isOverbooked = state.config.tablesAvailable && activeInSlot > state.config.tablesAvailable;
+
         // Time label (Column 1)
         const timeLabel = document.createElement('div');
         timeLabel.className = 'grid-time-label';
+        if (isOverbooked) timeLabel.classList.add('overbooked-text', 'overbooked-bg');
         timeLabel.style.gridColumn = '1';
         timeLabel.style.gridRow = `${row + 2}`;
         timeLabel.innerText = timeStr;
@@ -199,6 +214,7 @@ function renderScheduleGrid() {
         state.classes.forEach((cls, col) => {
             const cell = document.createElement('div');
             cell.className = 'grid-cell';
+            if (isOverbooked) cell.classList.add('overbooked-bg');
             cell.style.gridColumn = `${col + 2}`;
             cell.style.gridRow = `${row + 2}`;
             cell.dataset.time = timeStr;
@@ -576,6 +592,7 @@ function initApp() {
         state.config.start = document.getElementById('start-time').value;
         state.config.end = document.getElementById('end-time').value;
         state.config.slotLength = parseInt(document.getElementById('slot-length').value, 10);
+        state.config.tablesAvailable = parseInt(document.getElementById('tables-available').value, 10);
         renderAll();
     });
 
@@ -721,6 +738,8 @@ function initApp() {
     document.getElementById('start-time').value = state.config.start;
     document.getElementById('end-time').value = state.config.end;
     document.getElementById('slot-length').value = state.config.slotLength;
+    const tablesAvailEl = document.getElementById('tables-available');
+    if (tablesAvailEl) tablesAvailEl.value = state.config.tablesAvailable || 16;
 
     renderAll();
 }
